@@ -3,7 +3,7 @@ import csv
 from playwright.async_api import async_playwright
 
 async def get_all_universities(page):
-    # เปิดหน้าเว็บรวมมหาวิทยาลัย
+    # ดึงรายชื่อมหาวิทยาลัยทั้งหมด
     await page.goto("https://course.mytcas.com/universities")
     await page.wait_for_selector("a.brand")
 
@@ -13,7 +13,6 @@ async def get_all_universities(page):
     for link in links:
         href = await link.get_attribute("href")
         text = (await link.inner_text()).strip()
-
         if href and href.startswith("/universities/"):
             universities.append({
                 "name": text,
@@ -22,22 +21,41 @@ async def get_all_universities(page):
 
     return universities
 
-async def scrape_and_save():
+async def scrape_universities_with_engineering():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)  # headless=True ไม่แสดงหน้าจอ
+        browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
 
         universities = await get_all_universities(page)
+        results = []
 
-        # ปิด browser
+        for uni in universities:
+            await page.goto(uni["url"])
+            await page.wait_for_timeout(5000)  
+
+            faculty_links = await page.query_selector_all("a[href*='/faculties/']")
+
+            if not faculty_links:
+                print(f"ไม่มีข้อมูลคณะสำหรับ {uni['name']}")
+                continue  # ข้ามมหาวิทยาลัยนี้
+
+            for fl in faculty_links:
+                text = (await fl.inner_text()).strip()
+
+                if "วิศวกรรมศาสตร์" in text:
+                    results.append({
+                        "name": uni["name"],
+                        "faculty": text
+                    })
+
         await browser.close()
 
-    # ✅ บันทึกลง CSV
-    with open("universities_list.csv", "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["name", "url"])
+    # บันทึกลง CSV
+    with open("universities_with_engineering4.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["name", "faculty"])
         writer.writeheader()
-        writer.writerows(universities)
+        writer.writerows(results)
 
-    print(f"✅ บันทึกข้อมูล {len(universities)} มหาวิทยาลัยลง universities_list.csv เรียบร้อย!")
+    print(f"เจอมหาวิทยาลัยที่มีคณะวิศวกรรมศาสตร์ {len(results)} แห่ง")
 
-asyncio.run(scrape_and_save())
+asyncio.run(scrape_universities_with_engineering())
