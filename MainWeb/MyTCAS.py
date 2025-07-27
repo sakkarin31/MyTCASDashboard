@@ -2,35 +2,27 @@ import asyncio
 import csv
 from playwright.async_api import async_playwright
 
-async def scrape_programs(page, field_url):
+async def scrape_fee(page, program_url):
     """
-    เข้าไปที่หน้า field_url แล้วดึงชื่อหลักสูตรและ URL ของหลักสูตรทั้งหมดในหน้านั้น
+    เข้าไปหน้า program_url แล้วดึงค่าใช้จ่ายของหลักสูตร
     """
-    await page.goto(field_url)
-    await page.wait_for_selector("a[href*='/programs/']", timeout=10000)
+    await page.goto(program_url)
+    await page.wait_for_selector("dl", timeout=10000)
 
-    program_links = await page.query_selector_all("a[href*='/programs/']")
-    programs = []
-    for a in program_links:
-        href = await a.get_attribute("href")
-        # ดึงชื่อหลักสูตรจาก
-        program_span = await a.query_selector("span.program")
-        if program_span:
-            name = (await program_span.inner_text()).strip()
-        else:
-            name = (await a.inner_text()).strip()
-
-        if href and name:
-            full_url = href if href.startswith("http") else "https://course.mytcas.com" + href
-            programs.append({
-                "program_name": name,
-                "program_url": full_url
-            })
-    return programs
+    # หา element <dt> ที่มีข้อความ "ค่าใช้จ่าย"
+    dt_elements = await page.query_selector_all("dl dt")
+    for dt in dt_elements:
+        dt_text = (await dt.inner_text()).strip()
+        if "ค่าใช้จ่าย" in dt_text:
+            dd = await dt.evaluate_handle("el => el.nextElementSibling")
+            if dd:
+                fee_text = (await dd.inner_text()).strip()
+                return fee_text
+    return "ไม่พบข้อมูล"
 
 async def main():
-    input_file = "universities_faculty_filtered_fields2.csv"  
-    output_file = "programs_engineering.csv"
+    input_file = "programs_engineering.csv"  
+    output_file = "programs_with_fee.csv"
 
     rows = []
     with open(input_file, newline="", encoding="utf-8") as f:
@@ -47,36 +39,34 @@ async def main():
             university = row["university"]
             faculty = row["faculty"]
             field_name = row["field_name"]
-            field_url = row["field_url"]
+            program_name = row["program_name"]
+            program_url = row["program_url"]
 
-            print(f"Processing {university} | {faculty} | {field_name}")
+            print(f"ดึงค่าใช้จ่าย: {university} | {program_name}")
 
             try:
-                programs = await scrape_programs(page, field_url)
-                if not programs:
-                    print(f"ไม่พบหลักสูตรใน {field_name} ของ {university}")
-                    continue
-                for prog in programs:
-                    results.append({
-                        "university": university,
-                        "faculty": faculty,
-                        "field_name": field_name,
-                        "program_name": prog["program_name"],
-                        "program_url": prog["program_url"]
-                    })
-                print(f"เจอหลักสูตร {len(programs)} รายการ ใน {field_name} ของ {university}")
+                fee = await scrape_fee(page, program_url)
             except Exception as e:
-                print(f"Error ดึงหลักสูตรจาก {field_url}: {e}")
+                print(f"Error: {e}")
+                fee = "ไม่สามารถดึงข้อมูลได้"
+
+            results.append({
+                "university": university,
+                "faculty": faculty,
+                "field_name": field_name,
+                "program_name": program_name,
+                "fee": fee
+            })
 
         await browser.close()
 
-    # บันทึกไฟล์ CSV ผลลัพธ์
+    # เขียนไฟล์ CSV ใหม่ โดยแทน program_url ด้วยค่าใช้จ่าย
     with open(output_file, "w", newline="", encoding="utf-8") as f:
-        fieldnames = ["university", "faculty", "field_name", "program_name", "program_url"]
+        fieldnames = ["university", "faculty", "field_name", "program_name", "fee"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(results)
 
-    print(f"จบงาน บันทึกไฟล์ {output_file}")
+    print(f"เสร็จสิ้น บันทึกไฟล์ {output_file}")
 
 asyncio.run(main())
