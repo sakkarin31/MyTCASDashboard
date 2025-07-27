@@ -28,18 +28,18 @@ Supports **automated fee data scraping** from websites and **interactive dashboa
 ---
 
 ## 📁 Project Structure
-
+```
 📦 project_root/
-├── .gitignore
-├── admis.py # Data analysis or helper script
-├── Dashboard.py # Main Streamlit dashboard
-├── MainData.csv # Primary data used in the dashboard
-├── MyTCAS.py # Additional TCAS related script
-├── programs_with_fee.csv # Programs data with fees after scraping
-├── programs_with_rounds.csv # Programs data with admission rounds info
-├── requirements.txt # Python dependencies list
-└── README.md # This file
-
+├── 🙈 .gitignore                    # Git ignore patterns
+├── 🔍 admis.py                      # Data analysis and helper script
+├── 📊 Dashboard.py                  # Main Streamlit dashboard application
+├── 📋 MainData.csv                  # Primary dataset for dashboard
+├── 🎯 MyTCAS.py                     # TCAS related analysis script
+├── 💰 programs_with_fee.csv         # Program data with tuition fees
+├── 📅 programs_with_rounds.csv      # Program data with admission rounds
+├── 📦 requirements.txt              # Python dependencies list
+└── 📖 README.md                     # Project documentation (this file)
+```
 ---
 
 ## 🚀 Getting Started
