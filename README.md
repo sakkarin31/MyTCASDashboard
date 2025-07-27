@@ -1,4 +1,5 @@
 # MyTCASDashboard
+### ศักรินทร์ เหล็กแท้ รหัสนักศึกษา 6610110297
 # 🎓 Thai Computer Engineering Dashboard & Web Scraper
 
 A system developed to **collect** and **visualize** computer engineering program data from universities across Thailand.  
