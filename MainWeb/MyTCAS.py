@@ -1,41 +1,36 @@
 import asyncio
 import csv
-import re
 from playwright.async_api import async_playwright
 
-async def get_faculty_url(page, university_url, faculty_code):
-    await page.goto(university_url)
-    await page.wait_for_timeout(10000)  # รอโหลด
+async def scrape_programs(page, field_url):
+    """
+    เข้าไปที่หน้า field_url แล้วดึงชื่อหลักสูตรและ URL ของหลักสูตรทั้งหมดในหน้านั้น
+    """
+    await page.goto(field_url)
+    await page.wait_for_selector("a[href*='/programs/']", timeout=10000)
 
-    faculty_links = await page.query_selector_all("a[href*='/faculties/']")
-    for fl in faculty_links:
-        text = (await fl.inner_text()).strip()
-        match = re.match(r"(\d+)\.\s*(.+)", text)
-        if match:
-            code = match.group(1)
-            if code == faculty_code:
-                href = await fl.get_attribute("href")
-                return "https://course.mytcas.com" + href
-    return None
+    program_links = await page.query_selector_all("a[href*='/programs/']")
+    programs = []
+    for a in program_links:
+        href = await a.get_attribute("href")
+        # ดึงชื่อหลักสูตรจาก
+        program_span = await a.query_selector("span.program")
+        if program_span:
+            name = (await program_span.inner_text()).strip()
+        else:
+            name = (await a.inner_text()).strip()
 
-async def scrape_fields(page, faculty_url):
-    await page.goto(faculty_url)
-    await page.wait_for_selector("ul.u-list a[href*='/fields/']", timeout=20000)
-
-    field_links = await page.query_selector_all("ul.u-list a[href*='/fields/']")
-    fields = []
-    for link in field_links:
-        href = await link.get_attribute("href")
-        name = (await link.inner_text()).strip()
-        fields.append({
-            "field_name": name,
-            "field_url": "https://course.mytcas.com" + href
-        })
-    return fields
+        if href and name:
+            full_url = href if href.startswith("http") else "https://course.mytcas.com" + href
+            programs.append({
+                "program_name": name,
+                "program_url": full_url
+            })
+    return programs
 
 async def main():
-    input_file = "universities_with_engineering4.csv"
-    output_file = "universities_faculty_filtered_fields2.csv"
+    input_file = "universities_faculty_filtered_fields2.csv"  
+    output_file = "programs_engineering.csv"
 
     rows = []
     with open(input_file, newline="", encoding="utf-8") as f:
@@ -49,54 +44,39 @@ async def main():
 
         results = []
         for row in rows:
-            university_name = row["name"].strip()
-            faculty_full = row["faculty"].strip()
-            faculty_code = faculty_full.split(".")[0]
+            university = row["university"]
+            faculty = row["faculty"]
+            field_name = row["field_name"]
+            field_url = row["field_url"]
 
-            await page.goto("https://course.mytcas.com/universities")
-            await page.wait_for_selector("a.brand")
-            unv_links = await page.query_selector_all("a.brand")
-            university_url = None
-            for ul in unv_links:
-                text = (await ul.inner_text()).strip()
-                if text == university_name:
-                    href = await ul.get_attribute("href")
-                    university_url = "https://course.mytcas.com" + href
-                    break
-            if not university_url:
-                print(f"ไม่พบ URL มหาวิทยาลัย: {university_name}")
-                continue
-
-            faculty_url = await get_faculty_url(page, university_url, faculty_code)
-            if not faculty_url:
-                print(f"ไม่พบ URL คณะ {faculty_full} ใน {university_name}")
-                continue
+            print(f"Processing {university} | {faculty} | {field_name}")
 
             try:
-                fields = await scrape_fields(page, faculty_url)
-                if not fields:
-                    print(f"ไม่พบสาขาใน {faculty_full} ของ {university_name}")
+                programs = await scrape_programs(page, field_url)
+                if not programs:
+                    print(f"ไม่พบหลักสูตรใน {field_name} ของ {university}")
                     continue
-                for f in fields:
-                    if "คอมพิวเตอร์" in f["field_name"] or "ปัญญาประดิษฐ์" in f["field_name"]:
-                        results.append({
-                            "university": university_name,
-                            "faculty": faculty_full,
-                            "field_name": f["field_name"],
-                            "field_url": f["field_url"]
-                        })
-                print(f"ดึงข้อมูลสาขาที่กรองใน {faculty_full} ของ {university_name} จำนวน {len(results)} รายการ")
+                for prog in programs:
+                    results.append({
+                        "university": university,
+                        "faculty": faculty,
+                        "field_name": field_name,
+                        "program_name": prog["program_name"],
+                        "program_url": prog["program_url"]
+                    })
+                print(f"เจอหลักสูตร {len(programs)} รายการ ใน {field_name} ของ {university}")
             except Exception as e:
-                print(f"Error ดึงสาขา {faculty_full} ใน {university_name}: {e}")
+                print(f"Error ดึงหลักสูตรจาก {field_url}: {e}")
 
         await browser.close()
 
+    # บันทึกไฟล์ CSV ผลลัพธ์
     with open(output_file, "w", newline="", encoding="utf-8") as f:
-        fieldnames = ["university", "faculty", "field_name", "field_url"]
+        fieldnames = ["university", "faculty", "field_name", "program_name", "program_url"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(results)
 
-    print(f"จบการทำงาน บันทึกไฟล์ {output_file}")
+    print(f"จบงาน บันทึกไฟล์ {output_file}")
 
 asyncio.run(main())
