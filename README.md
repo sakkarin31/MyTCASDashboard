@@ -62,7 +62,7 @@ pip install -r requirements.txt
 playwright install 
 ```
 
-###2️⃣ Run the Streamlit Dashboard
+###  2️⃣ Run the Streamlit Dashboard
 
 ```bash
 streamlit run Dashboard.py
