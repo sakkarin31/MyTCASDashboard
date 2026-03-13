@@ -48,6 +48,8 @@ Supports **automated fee data scraping** from websites and **interactive dashboa
 ### 1️⃣ Setup Python Environment and Install Dependencies
 
 ```bash
+cd Finalweb
+
 # Create virtual environment
 python -m venv venv
 
